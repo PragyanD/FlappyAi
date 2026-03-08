@@ -111,7 +111,7 @@ class Bird {
     this.alive     = true;
     this.ticks     = 0;
     this.fadeTimer = 0;   // 0 = alive; >0 = fading out (increments each render frame)
-    this.brain     = brain || new NeuralNetwork(3, 6, 1);
+    this.brain     = brain || new NeuralNetwork(4, 6, 1);
   }
 
   reset() {
@@ -142,8 +142,9 @@ class Bird {
     const inp0 = this.y / height;
     const inp1 = (nextPipe.x - this.x) / width;
     const inp2 = nextPipe.gapCY / height;
+    const inp3 = this.vy / 20;   // normalized velocity; vy range is roughly -9 to +10
 
-    const output = this.brain.predict([inp0, inp1, inp2]);
+    const output = this.brain.predict([inp0, inp1, inp2, inp3]);
     if (output > 0.5) {
       this.vy = FLAP_VEL;
     }
@@ -550,7 +551,7 @@ function drawNNOverlay(nn) {
   noStroke();
 
   // Input nodes + labels
-  const inputLabels = ['Y', 'DIST', 'GAP'];
+  const inputLabels = ['Y', 'DIST', 'GAP', 'VEL'];
   for (let i = 0; i < iCount; i++) {
     const act = nn.lastInputs ? nn.lastInputs[i] : 0;
     fill(lerpColor(color(50, 50, 50), color(255, 220, 50), act));
