@@ -6,12 +6,112 @@
   <title>FlappyAI</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { overflow: hidden; background: #71c5ce; }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      background: #1a1a1a;
+    }
+
+    #controls {
+      flex-shrink: 0;
+      background: #111;
+      color: #ccc;
+      padding: 7px 16px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      font: 12px/1 monospace;
+      border-bottom: 1px solid #333;
+    }
+
+    #controls label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+    }
+
+    #controls input[type="number"] {
+      width: 58px;
+      padding: 3px 5px;
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 3px;
+      font: 12px monospace;
+    }
+
+    #controls input[type="range"] {
+      width: 110px;
+      accent-color: #4aaa88;
+    }
+
+    #controls button {
+      padding: 4px 13px;
+      background: #2a7a5a;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font: 12px monospace;
+      transition: background 0.15s;
+    }
+
+    #controls button:hover { background: #3a9a6a; }
+
+    #speed-val {
+      min-width: 28px;
+      display: inline-block;
+      color: #fff;
+    }
+
     canvas { display: block; }
   </style>
 </head>
 <body>
+  <div id="controls">
+    <label>
+      Birds
+      <input type="number" id="birdCount" value="50" min="5" max="500" step="5">
+    </label>
+    <button id="restartBtn">Restart</button>
+    <label>
+      Speed
+      <input type="range" id="speedSlider" min="1" max="20" value="1" step="1">
+      <span id="speed-val">1×</span>
+    </label>
+  </div>
+
   <script src="p5.js"></script>
   <script src="game.js"></script>
+
+  <script>
+    // Speed slider
+    const speedSlider = document.getElementById('speedSlider');
+    const speedVal    = document.getElementById('speed-val');
+    speedSlider.addEventListener('input', () => {
+      window._flappySpeed = parseInt(speedSlider.value, 10);
+      speedVal.textContent = speedSlider.value + '×';
+    });
+
+    // Bird count + restart
+    const restartBtn  = document.getElementById('restartBtn');
+    const birdCountEl = document.getElementById('birdCount');
+    restartBtn.addEventListener('click', () => {
+      const n = parseInt(birdCountEl.value, 10);
+      if (n >= 5 && n <= 500) {
+        window._flappyPopSize = n;
+        window._flappyRestart = true;
+      }
+    });
+
+    // Defaults
+    window._flappySpeed   = 1;
+    window._flappyPopSize = 50;
+    window._flappyRestart = false;
+  </script>
 </body>
 </html>
