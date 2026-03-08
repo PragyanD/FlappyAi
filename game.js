@@ -272,6 +272,7 @@ let tick      = 0;
 let bestScore = 0;
 let bestBrain = null;
 let curGapH   = BASE_GAP;
+let pipesPassed = 0;
 
 // ============================================================
 // setup
@@ -295,6 +296,7 @@ function windowResized() {
 function nextGen() {
   gen++;
   tick  = 0;
+  pipesPassed = 0;
   pipes = [];
 
   curGapH = max(BASE_GAP - (gen - 1) * GAP_SHRINK, MIN_GAP);
@@ -318,40 +320,22 @@ function nextGen() {
 }
 
 // ============================================================
-// draw
+// updateSim
 // ============================================================
-function draw() {
-  // Sky background
-  background(113, 197, 207);
+function updateSim() {
+  tick++;
 
-  // Clouds
-  drawClouds();
-
-  // Ground: brown fill with green strip at top
-  fill(210, 180, 120);
-  noStroke();
-  rect(0, height - GROUND_H, width, GROUND_H);
-  fill(98, 165, 45);
-  noStroke();
-  rect(0, height - GROUND_H, width, 12);
-
-  // Spawn pipe every PIPE_INTERVAL ticks
   if (tick % PIPE_INTERVAL === 0) {
     pipes.push(new Pipe(curGapH));
   }
 
-  // Update and draw pipes; remove offscreen ones
   for (let i = pipes.length - 1; i >= 0; i--) {
     pipes[i].update();
-    pipes[i].draw();
     if (pipes[i].offscreen()) {
+      pipesPassed++;
       pipes.splice(i, 1);
     }
   }
-
-  // Update birds, apply collision
-  let aliveCount = 0;
-  let bestAlive  = null;
 
   for (let b of birds) {
     if (!b.alive) continue;
@@ -360,49 +344,68 @@ function draw() {
     for (let p of pipes) {
       if (b.alive) b.hits(p);
     }
+  }
+}
+
+// ============================================================
+// evolve
+// ============================================================
+function evolve() {
+  let best = null;
+  for (let b of birds) {
+    if (!best || b.ticks > best.ticks) best = b;
+  }
+  if (best) {
+    if (best.ticks > bestScore) bestScore = best.ticks;
+    bestBrain = best.brain.copy();
+  }
+  nextGen();
+}
+
+// ============================================================
+// renderFrame
+// ============================================================
+function renderFrame() {
+  background(113, 197, 207);
+  drawClouds();
+
+  fill(210, 180, 120); noStroke();
+  rect(0, height - GROUND_H, width, GROUND_H);
+  fill(98, 165, 45); noStroke();
+  rect(0, height - GROUND_H, width, 12);
+
+  for (let p of pipes) p.draw();
+
+  let bestAlive = null;
+  for (let b of birds) {
     if (b.alive) {
-      aliveCount++;
-      if (!bestAlive || b.ticks > bestAlive.ticks) {
-        bestAlive = b;
-      }
+      if (!bestAlive || b.ticks > bestAlive.ticks) bestAlive = b;
     }
   }
+  for (let b of birds) { if (!b.alive)                   b.draw(false); }
+  for (let b of birds) { if (b.alive && b !== bestAlive) b.draw(false); }
+  if (bestAlive) bestAlive.draw(true);
 
-  // Draw order: dead first (underneath), then alive non-best, then best on top
-  for (let b of birds) {
-    if (!b.alive) b.draw(false);
-  }
-  for (let b of birds) {
-    if (b.alive && b !== bestAlive) b.draw(false);
-  }
-  if (bestAlive) {
-    bestAlive.draw(true);
-  }
-
-  // HUD
   const score = bestAlive ? bestAlive.ticks : 0;
-  drawHUD(aliveCount, score);
+  const alive = birds.filter(b => b.alive).length;
+  drawHUD(alive, score);
+}
 
-  // End of generation: all birds dead
-  if (aliveCount === 0) {
-    // Find bird with highest ticks to save its brain
-    let best = null;
-    for (let b of birds) {
-      if (!best || b.ticks > best.ticks) {
-        best = b;
-      }
+// ============================================================
+// draw
+// ============================================================
+function draw() {
+  const speed = window._flappySpeed || 1;
+
+  for (let s = 0; s < speed; s++) {
+    updateSim();
+    if (birds.every(b => !b.alive)) {
+      evolve();
+      break;
     }
-    if (best) {
-      if (best.ticks > bestScore) {
-        bestScore = best.ticks;
-      }
-      bestBrain = best.brain.copy();
-    }
-    nextGen();
-    return;
   }
 
-  tick++;
+  renderFrame();
 }
 
 // ============================================================
