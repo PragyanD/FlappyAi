@@ -294,7 +294,8 @@ let pipes     = [];
 let gen       = 0;
 let tick      = 0;
 let bestScore = 0;
-let bestBrain = null;
+let bestBrain  = null;   // kept for NN overlay vizBrain fallback
+let eliteBrains = [];    // [{brain, ticks}, ...] top-3, sorted descending by ticks
 let curGapH   = BASE_GAP;
 let pipesPassed = 0;
 
@@ -326,14 +327,17 @@ function nextGen() {
   curGapH = max(BASE_GAP - (gen - 1) * GAP_SHRINK, MIN_GAP);
 
   birds = [];
-  if (bestBrain) {
-    // 1 elite clone
-    birds.push(new Bird(bestBrain.copy()));
-    // 49 mutated copies
-    for (let i = 1; i < popSize; i++) {
-      const mutatedBrain = bestBrain.copy();
-      mutatedBrain.mutate(0.2, 0.3);
-      birds.push(new Bird(mutatedBrain));
+  if (eliteBrains.length > 0) {
+    // Clone each elite once (up to 3 elites, or fewer if popSize is tiny)
+    const eliteCount = min(eliteBrains.length, popSize);
+    for (let i = 0; i < eliteCount; i++) {
+      birds.push(new Bird(eliteBrains[i].brain.copy()));
+    }
+    // Fill remainder with mutations, cycling through elites
+    for (let i = eliteCount; i < popSize; i++) {
+      const src = eliteBrains[i % eliteBrains.length].brain.copy();
+      src.mutate(0.2, 0.3);
+      birds.push(new Bird(src));
     }
   } else {
     // First generation: all random
@@ -375,14 +379,26 @@ function updateSim() {
 // evolve
 // ============================================================
 function evolve() {
-  let best = null;
-  for (let b of birds) {
-    if (!best || b.ticks > best.ticks) best = b;
+  // Sort all birds by ticks descending
+  const ranked = birds.slice().sort((a, b) => b.ticks - a.ticks);
+
+  // Update bestScore
+  if (ranked[0] && ranked[0].ticks > bestScore) {
+    bestScore = ranked[0].ticks;
   }
-  if (best) {
-    if (best.ticks > bestScore) bestScore = best.ticks;
-    bestBrain = best.brain.copy();
+
+  // Merge this generation's top-3 into eliteBrains, keep best 3 overall
+  for (let i = 0; i < min(3, ranked.length); i++) {
+    if (ranked[i].ticks > 0) {
+      eliteBrains.push({ brain: ranked[i].brain.copy(), ticks: ranked[i].ticks });
+    }
   }
+  eliteBrains.sort((a, b) => b.ticks - a.ticks);
+  if (eliteBrains.length > 3) eliteBrains.length = 3;
+
+  // Keep bestBrain pointing to the all-time best (for vizBrain fallback)
+  if (eliteBrains.length > 0) bestBrain = eliteBrains[0].brain;
+
   nextGen();
 }
 
@@ -435,10 +451,11 @@ function draw() {
   // Handle restart request from HTML controls
   if (window._flappyRestart) {
     window._flappyRestart = false;
-    popSize   = window._flappyPopSize || 50;
-    gen       = 0;
-    bestScore = 0;
-    bestBrain = null;
+    popSize     = window._flappyPopSize || 50;
+    gen         = 0;
+    bestScore   = 0;
+    bestBrain   = null;
+    eliteBrains = [];
     nextGen();
   }
 
