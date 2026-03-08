@@ -57,7 +57,14 @@ class NeuralNetwork {
     for (let h = 0; h < this.hSize; h++) {
       outSum += this.wHO[0][h] * hidden[h];
     }
-    return this._sig(outSum);
+    const output = this._sig(outSum);
+
+    // Store for visualization
+    this.lastInputs = inputs.slice();
+    this.lastHidden = hidden.slice();
+    this.lastOutput = output;
+
+    return output;
   }
 
   copy() {
@@ -405,6 +412,19 @@ function renderFrame() {
   const score = bestAlive ? bestAlive.ticks : 0;
   const alive = birds.filter(b => b.alive).length;
   drawHUD(alive, score);
+
+  // NN overlay: best alive bird, or fall back to bestBrain
+  let vizBrain = null;
+  for (let b of birds) {
+    if (b.alive) {
+      if (!vizBrain || b.ticks > (vizBrain._ticks || 0)) {
+        b.brain._ticks = b.ticks;
+        vizBrain = b.brain;
+      }
+    }
+  }
+  if (!vizBrain) vizBrain = bestBrain;
+  drawNNOverlay(vizBrain);
 }
 
 // ============================================================
@@ -460,6 +480,110 @@ function drawClouds() {
     ellipse(cx + 60,  cy,       80 * s, 40 * s);
     ellipse(cx + 90,  cy + 5,   60 * s, 35 * s);
   }
+}
+
+// ============================================================
+// drawNNOverlay
+// ============================================================
+function drawNNOverlay(nn) {
+  if (!nn || !nn.lastHidden) return;
+
+  const PW  = 230;
+  const PH  = 185;
+  const PAD = 12;
+  const px  = width  - PW - PAD;
+  const py  = height - PH - PAD;
+  const NR  = 8;
+
+  // Panel background
+  fill(15, 15, 15, 185);
+  noStroke();
+  rect(px, py, PW, PH, 8);
+
+  // Title
+  fill(150);
+  noStroke();
+  textSize(10);
+  textAlign(LEFT, TOP);
+  text('NEURAL NET  (best bird)', px + 10, py + 8);
+
+  // Column x positions
+  const colX = [px + 42, px + 115, px + 190];
+
+  const iCount = nn.iSize;
+  const hCount = nn.hSize;
+  const oCount = nn.oSize;
+
+  function colYs(count) {
+    const ys = [];
+    const usable = PH - 36;
+    for (let i = 0; i < count; i++) {
+      ys.push(py + 28 + (usable / (count + 1)) * (i + 1));
+    }
+    return ys;
+  }
+
+  const iYs = colYs(iCount);
+  const hYs = colYs(hCount);
+  const oYs = colYs(oCount);
+
+  // Connections: input → hidden
+  for (let h = 0; h < hCount; h++) {
+    for (let i = 0; i < iCount; i++) {
+      const w = nn.wIH[h][i];
+      const c = w > 0 ? color(50, 210, 120, 130) : color(210, 60, 60, 130);
+      stroke(c);
+      strokeWeight(constrain(abs(w) * 1.2, 0.3, 2.5));
+      line(colX[0], iYs[i], colX[1], hYs[h]);
+    }
+  }
+
+  // Connections: hidden → output
+  for (let h = 0; h < hCount; h++) {
+    const w = nn.wHO[0][h];
+    const c = w > 0 ? color(50, 210, 120, 130) : color(210, 60, 60, 130);
+    stroke(c);
+    strokeWeight(constrain(abs(w) * 1.2, 0.3, 2.5));
+    line(colX[1], hYs[h], colX[2], oYs[0]);
+  }
+
+  noStroke();
+
+  // Input nodes + labels
+  const inputLabels = ['Y', 'DIST', 'GAP'];
+  for (let i = 0; i < iCount; i++) {
+    const act = nn.lastInputs ? nn.lastInputs[i] : 0;
+    fill(lerpColor(color(50, 50, 50), color(255, 220, 50), act));
+    ellipse(colX[0], iYs[i], NR * 2, NR * 2);
+    fill(180);
+    textSize(8);
+    textAlign(RIGHT, CENTER);
+    text(inputLabels[i] || '?', colX[0] - NR - 3, iYs[i]);
+  }
+
+  // Hidden nodes
+  for (let h = 0; h < hCount; h++) {
+    const act = nn.lastHidden ? nn.lastHidden[h] : 0;
+    fill(lerpColor(color(50, 50, 50), color(80, 180, 255), act));
+    ellipse(colX[1], hYs[h], NR * 2, NR * 2);
+  }
+
+  // Output node
+  const outAct = nn.lastOutput || 0;
+  fill(outAct > 0.5 ? color(80, 240, 100) : color(50, 50, 50));
+  ellipse(colX[2], oYs[0], NR * 2, NR * 2);
+  fill(180);
+  textSize(8);
+  textAlign(LEFT, CENTER);
+  text('FLAP', colX[2] + NR + 3, oYs[0]);
+
+  // Column headers
+  fill(120);
+  textSize(8);
+  textAlign(CENTER, TOP);
+  text('IN',     colX[0], py + 18);
+  text('HIDDEN', colX[1], py + 18);
+  text('OUT',    colX[2], py + 18);
 }
 
 // ============================================================
