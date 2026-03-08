@@ -180,6 +180,7 @@ class Bird {
     let alpha;
     if (!this.alive) {
       const FADE_FRAMES = 20;
+      if (this.fadeTimer > FADE_FRAMES) return;  // already fully faded
       alpha = 45 * max(0, 1 - this.fadeTimer / FADE_FRAMES);
       this.fadeTimer++;
       if (alpha <= 0) return;   // fully faded — skip drawing
