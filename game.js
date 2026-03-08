@@ -1,7 +1,7 @@
 // ============================================================
 // Constants
 // ============================================================
-const POP_SIZE      = 50;
+let popSize = 50;
 const GRAVITY       = 0.5;
 const FLAP_VEL      = -9;
 const PIPE_SPEED    = 3;
@@ -322,14 +322,14 @@ function nextGen() {
     // 1 elite clone
     birds.push(new Bird(bestBrain.copy()));
     // 49 mutated copies
-    for (let i = 1; i < POP_SIZE; i++) {
+    for (let i = 1; i < popSize; i++) {
       const mutatedBrain = bestBrain.copy();
       mutatedBrain.mutate(0.2, 0.3);
       birds.push(new Bird(mutatedBrain));
     }
   } else {
     // First generation: all random
-    for (let i = 0; i < POP_SIZE; i++) {
+    for (let i = 0; i < popSize; i++) {
       birds.push(new Bird());
     }
   }
@@ -411,6 +411,16 @@ function renderFrame() {
 // draw
 // ============================================================
 function draw() {
+  // Handle restart request from HTML controls
+  if (window._flappyRestart) {
+    window._flappyRestart = false;
+    popSize   = window._flappyPopSize || 50;
+    gen       = 0;
+    bestScore = 0;
+    bestBrain = null;
+    nextGen();
+  }
+
   const speed = window._flappySpeed || 1;
 
   for (let s = 0; s < speed; s++) {
@@ -468,7 +478,7 @@ function drawHUD(alive, score) {
   textAlign(LEFT, TOP);
 
   text('GEN   ' + gen,                    24, 24);
-  text('ALIVE ' + alive + '/' + POP_SIZE, 24, 44);
+  text('ALIVE ' + alive + '/' + popSize, 24, 44);
   text('SCORE ' + score,                  24, 64);
   text('BEST  ' + bestScore,              24, 84);
 }
