@@ -101,17 +101,24 @@ class Bird {
     this.x     = 90;
     this.y     = height / 2;
     this.vy    = 0;
-    this.alive = true;
-    this.ticks = 0;
-    this.brain = brain || new NeuralNetwork(3, 6, 1);
+    this.alive     = true;
+    this.ticks     = 0;
+    this.fadeTimer = 0;   // 0 = alive; >0 = fading out (increments each render frame)
+    this.brain     = brain || new NeuralNetwork(3, 6, 1);
   }
 
   reset() {
-    this.x     = 90;
-    this.y     = height / 2;
-    this.vy    = 0;
-    this.alive = true;
-    this.ticks = 0;
+    this.x         = 90;
+    this.y         = height / 2;
+    this.vy        = 0;
+    this.alive     = true;
+    this.ticks     = 0;
+    this.fadeTimer = 0;
+  }
+
+  die() {
+    this.alive     = false;
+    this.fadeTimer = 1;   // start fade at frame 1
   }
 
   think(pipes) {
@@ -142,7 +149,7 @@ class Bird {
 
     // Hit ceiling or ground
     if (this.y - BIRD_R <= 0 || this.y + BIRD_R >= height - GROUND_H) {
-      this.alive = false;
+      this.die();
     }
   }
 
@@ -165,12 +172,20 @@ class Bird {
     if (bTop >= gapTop && bBottom <= gapBottom) return false;
 
     // Bird is outside gap while overlapping horizontally
-    this.alive = false;
+    this.die();   // was: this.alive = false
     return true;
   }
 
   draw(isBest) {
-    const alpha = isBest ? 255 : 45;
+    let alpha;
+    if (!this.alive) {
+      const FADE_FRAMES = 20;
+      alpha = 45 * max(0, 1 - this.fadeTimer / FADE_FRAMES);
+      this.fadeTimer++;
+      if (alpha <= 0) return;   // fully faded — skip drawing
+    } else {
+      alpha = isBest ? 255 : 45;
+    }
     push();
     translate(this.x, this.y);
 
