@@ -608,19 +608,18 @@ function drawNNOverlay(nn) {
 // drawHUD
 // ============================================================
 function drawHUD(alive, score) {
-  // Semi-transparent dark rounded background
   fill(20, 20, 20, 160);
   noStroke();
-  rect(12, 12, 190, 95, 10);
+  rect(12, 12, 195, 115, 10);
 
-  // White monospace text
   fill(255);
   noStroke();
   textSize(14);
   textAlign(LEFT, TOP);
 
   text('GEN   ' + gen,                    24, 24);
-  text('ALIVE ' + alive + '/' + popSize, 24, 44);
+  text('ALIVE ' + alive + '/' + popSize,  24, 44);
   text('SCORE ' + score,                  24, 64);
   text('BEST  ' + bestScore,              24, 84);
+  text('PIPES ' + pipesPassed,            24, 104);
 }
