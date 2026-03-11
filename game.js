@@ -2,16 +2,16 @@
 // Constants
 // ============================================================
 let popSize = 50;
-const GRAVITY       = 0.5;
-const FLAP_VEL      = -9;
-const PIPE_SPEED    = 3;
-const PIPE_INTERVAL = 90;
-const PIPE_W        = 58;
-const BASE_GAP      = 150;
-const MIN_GAP       = 110;
-const GAP_SHRINK    = 2;
-const GROUND_H      = 70;
-const BIRD_R        = 13;
+const GRAVITY = 0.5;
+const FLAP_VEL = -9;
+const PIPE_SPEED = 3;
+const PIPE_INTERVAL = 75;
+const PIPE_W = 58;
+const BASE_GAP = 140;
+const MIN_GAP = 140;
+const GAP_SHRINK = 0;
+const GROUND_H = 70;
+const BIRD_R = 13;
 
 // ============================================================
 // NeuralNetwork
@@ -22,9 +22,9 @@ class NeuralNetwork {
     this.hSize = h;
     this.oSize = o;
     this.wIH = this._randMat(h, i);
-    this.bH  = this._randMat(h, 1);
+    this.bH = this._randMat(h, 1);
     this.wHO = this._randMat(o, h);
-    this.bO  = this._randMat(o, 1);
+    this.bO = this._randMat(o, 1);
   }
 
   _randMat(r, c) {
@@ -70,9 +70,9 @@ class NeuralNetwork {
   copy() {
     const nn = new NeuralNetwork(this.iSize, this.hSize, this.oSize);
     nn.wIH = this.wIH.map(row => row.slice());
-    nn.bH  = this.bH.map(row => row.slice());
+    nn.bH = this.bH.map(row => row.slice());
     nn.wHO = this.wHO.map(row => row.slice());
-    nn.bO  = this.bO.map(row => row.slice());
+    nn.bO = this.bO.map(row => row.slice());
     return nn;
   }
 
@@ -87,7 +87,7 @@ class NeuralNetwork {
               m[r][c] = random(-1, 1);
             } else {
               m[r][c] += random(-strength, strength);
-              m[r][c] = constrain(m[r][c], -2, 2);
+              m[r][c] = constrain(m[r][c], -10, 10);
             }
           }
         }
@@ -98,6 +98,25 @@ class NeuralNetwork {
     mutateMatrix(this.wHO);
     mutateMatrix(this.bO);
   }
+
+  crossover(partner) {
+    const child = new NeuralNetwork(this.iSize, this.hSize, this.oSize);
+
+    // Helper to randomly inherit weights from parent A or parent B
+    const crossMatrix = (mChild, mA, mB) => {
+      for (let r = 0; r < mChild.length; r++) {
+        for (let c = 0; c < mChild[r].length; c++) {
+          mChild[r][c] = random(1) < 0.5 ? mA[r][c] : mB[r][c];
+        }
+      }
+    };
+
+    crossMatrix(child.wIH, this.wIH, partner.wIH);
+    crossMatrix(child.bH, this.bH, partner.bH);
+    crossMatrix(child.wHO, this.wHO, partner.wHO);
+    crossMatrix(child.bO, this.bO, partner.bO);
+    return child;
+  }
 }
 
 // ============================================================
@@ -105,26 +124,26 @@ class NeuralNetwork {
 // ============================================================
 class Bird {
   constructor(brain) {
-    this.x     = 90;
-    this.y     = height / 2;
-    this.vy    = 0;
-    this.alive     = true;
-    this.ticks     = 0;
+    this.x = 90;
+    this.y = height / 2;
+    this.vy = 0;
+    this.alive = true;
+    this.ticks = 0;
     this.fadeTimer = 0;   // 0 = alive; >0 = fading out (increments each render frame)
-    this.brain     = brain || new NeuralNetwork(4, 6, 1);
+    this.brain = brain || new NeuralNetwork(5, 6, 1);
   }
 
   reset() {
-    this.x         = 90;
-    this.y         = height / 2;
-    this.vy        = 0;
-    this.alive     = true;
-    this.ticks     = 0;
+    this.x = 90;
+    this.y = height / 2;
+    this.vy = 0;
+    this.alive = true;
+    this.ticks = 0;
     this.fadeTimer = 0;
   }
 
   die() {
-    this.alive     = false;
+    this.alive = false;
     this.fadeTimer = 1;   // start fade at frame 1
   }
 
@@ -139,12 +158,16 @@ class Bird {
     }
     if (!nextPipe) return;
 
-    const inp0 = this.y / height;
-    const inp1 = (nextPipe.x - this.x) / width;
-    const inp2 = nextPipe.gapCY / height;
-    const inp3 = this.vy / 20;   // normalized velocity; vy range is roughly -9 to +10
+    const gapTop = nextPipe.gapCY - nextPipe.gapH / 2;
+    const gapBottom = nextPipe.gapCY + nextPipe.gapH / 2;
 
-    const output = this.brain.predict([inp0, inp1, inp2, inp3]);
+    const inp0 = this.y / height;
+    const inp1 = (nextPipe.x + PIPE_W - this.x) / width;
+    const inp2 = (gapTop - this.y) / height;
+    const inp3 = (gapBottom - this.y) / height;
+    const inp4 = this.vy / 12;
+
+    const output = this.brain.predict([inp0, inp1, inp2, inp3, inp4]);
     if (output > 0.5) {
       this.vy = FLAP_VEL;
     }
@@ -152,7 +175,7 @@ class Bird {
 
   update() {
     this.vy += GRAVITY;
-    this.y  += this.vy;
+    this.y += this.vy;
     this.ticks++;
 
     // Hit ceiling or ground
@@ -162,18 +185,18 @@ class Bird {
   }
 
   hits(pipe) {
-    const bLeft   = this.x - BIRD_R;
-    const bRight  = this.x + BIRD_R;
-    const bTop    = this.y - BIRD_R;
+    const bLeft = this.x - BIRD_R;
+    const bRight = this.x + BIRD_R;
+    const bTop = this.y - BIRD_R;
     const bBottom = this.y + BIRD_R;
 
-    const pLeft  = pipe.x;
+    const pLeft = pipe.x;
     const pRight = pipe.x + PIPE_W;
 
     // No horizontal overlap
     if (bRight < pLeft || bLeft > pRight) return false;
 
-    const gapTop    = pipe.gapCY - pipe.gapH / 2;
+    const gapTop = pipe.gapCY - pipe.gapH / 2;
     const gapBottom = pipe.gapCY + pipe.gapH / 2;
 
     // If bird is fully within the gap vertically, no collision
@@ -237,8 +260,8 @@ class Bird {
 // ============================================================
 class Pipe {
   constructor(gapH) {
-    this.x     = width + 10;
-    this.gapH  = gapH;
+    this.x = width + 10;
+    this.gapH = gapH;
     this.gapCY = random(gapH / 2 + 80, height - GROUND_H - gapH / 2 - 30);
   }
 
@@ -251,13 +274,13 @@ class Pipe {
   }
 
   draw() {
-    const pipeGreen   = color(98, 165, 45);
-    const capGreen    = color(78, 140, 30);
+    const pipeGreen = color(98, 165, 45);
+    const capGreen = color(78, 140, 30);
     const strokeGreen = color(55, 110, 20);
-    const CAP_H       = 22;
-    const CAP_EXTRA   = 10; // 5px each side
+    const CAP_H = 22;
+    const CAP_EXTRA = 10; // 5px each side
 
-    const gapTop    = this.gapCY - this.gapH / 2;
+    const gapTop = this.gapCY - this.gapH / 2;
     const gapBottom = this.gapCY + this.gapH / 2;
 
     strokeWeight(2);
@@ -289,14 +312,14 @@ class Pipe {
 // ============================================================
 // Sketch globals
 // ============================================================
-let birds     = [];
-let pipes     = [];
-let gen       = 0;
-let tick      = 0;
+let birds = [];
+let pipes = [];
+let gen = 0;
+let tick = 0;
 let bestScore = 0;
-let bestBrain  = null;   // kept for NN overlay vizBrain fallback
+let bestBrain = null;   // kept for NN overlay vizBrain fallback
 let eliteBrains = [];    // [{brain, ticks}, ...] top-3, sorted descending by ticks
-let curGapH   = BASE_GAP;
+let curGapH = BASE_GAP;
 let pipesPassed = 0;
 
 // ============================================================
@@ -320,7 +343,7 @@ function windowResized() {
 // ============================================================
 function nextGen() {
   gen++;
-  tick  = 0;
+  tick = 0;
   pipesPassed = 0;
   pipes = [];
 
@@ -328,16 +351,23 @@ function nextGen() {
 
   birds = [];
   if (eliteBrains.length > 0) {
-    // Clone each elite once (up to 3 elites, or fewer if popSize is tiny)
+    // Clone each elite directly (elitism ensures top performers survive)
     const eliteCount = min(eliteBrains.length, popSize);
     for (let i = 0; i < eliteCount; i++) {
       birds.push(new Bird(eliteBrains[i].brain.copy()));
     }
-    // Fill remainder with mutations, cycling through elites
+
+    // Fill remainder with crossover (breeding) and mutation!
     for (let i = eliteCount; i < popSize; i++) {
-      const src = eliteBrains[i % eliteBrains.length].brain.copy();
-      src.mutate(0.2, 0.3);
-      birds.push(new Bird(src));
+      const parentA = random(eliteBrains).brain;
+      const parentB = random(eliteBrains).brain;
+
+      const childBrain = parentA.crossover(parentB);
+      // Mutate the child (with a gradually reducing rate based on best score for fine-tuning)
+      const mutRate = bestScore > 1000 ? 0.05 : 0.15;
+      childBrain.mutate(mutRate, 0.2);
+
+      birds.push(new Bird(childBrain));
     }
   } else {
     // First generation: all random
@@ -351,11 +381,10 @@ function nextGen() {
 // updateSim
 // ============================================================
 function updateSim() {
-  tick++;
-
   if (tick % PIPE_INTERVAL === 0) {
     pipes.push(new Pipe(curGapH));
   }
+  tick++;
 
   for (let i = pipes.length - 1; i >= 0; i--) {
     pipes[i].update();
@@ -387,14 +416,18 @@ function evolve() {
     bestScore = ranked[0].ticks;
   }
 
-  // Merge this generation's top-3 into eliteBrains, keep best 3 overall
-  for (let i = 0; i < min(3, ranked.length); i++) {
+  // Merge this generation's top-15 into eliteBrains, keep best 15 overall
+  // The literature emphasizes that maintaining generic diversity is vital!
+  const NUM_ELITES = 15;
+  for (let i = 0; i < min(NUM_ELITES, ranked.length); i++) {
     if (ranked[i].ticks > 0) {
       eliteBrains.push({ brain: ranked[i].brain.copy(), ticks: ranked[i].ticks });
     }
   }
+
+  // Sort elite pool and trim to top N
   eliteBrains.sort((a, b) => b.ticks - a.ticks);
-  if (eliteBrains.length > 3) eliteBrains.length = 3;
+  eliteBrains = eliteBrains.slice(0, NUM_ELITES);
 
   // Keep bestBrain pointing to the all-time best (for vizBrain fallback)
   if (eliteBrains.length > 0) bestBrain = eliteBrains[0].brain;
@@ -422,7 +455,7 @@ function renderFrame() {
       if (!bestAlive || b.ticks > bestAlive.ticks) bestAlive = b;
     }
   }
-  for (let b of birds) { if (!b.alive)                   b.draw(false); }
+  for (let b of birds) { if (!b.alive) b.draw(false); }
   for (let b of birds) { if (b.alive && b !== bestAlive) b.draw(false); }
   if (bestAlive) bestAlive.draw(true);
 
@@ -451,10 +484,10 @@ function draw() {
   // Handle restart request from HTML controls
   if (window._flappyRestart) {
     window._flappyRestart = false;
-    popSize     = window._flappyPopSize || 50;
-    gen         = 0;
-    bestScore   = 0;
-    bestBrain   = null;
+    popSize = window._flappyPopSize || 50;
+    gen = 0;
+    bestScore = 0;
+    bestBrain = null;
     eliteBrains = [];
     nextGen();
   }
@@ -481,10 +514,10 @@ function drawClouds() {
 
   // Each cloud: [cx, cy, scale]
   const clouds = [
-    [120,  60, 1.0],
-    [320,  40, 0.8],
-    [580,  75, 1.2],
-    [800,  50, 0.9],
+    [120, 60, 1.0],
+    [320, 40, 0.8],
+    [580, 75, 1.2],
+    [800, 50, 0.9],
     [1050, 65, 1.1],
     [1280, 45, 0.85],
   ];
@@ -492,11 +525,11 @@ function drawClouds() {
   for (let i = 0; i < clouds.length; i++) {
     const cx = clouds[i][0];
     const cy = clouds[i][1];
-    const s  = clouds[i][2];
-    ellipse(cx,       cy,       80 * s, 45 * s);
-    ellipse(cx + 30,  cy - 10,  70 * s, 50 * s);
-    ellipse(cx + 60,  cy,       80 * s, 40 * s);
-    ellipse(cx + 90,  cy + 5,   60 * s, 35 * s);
+    const s = clouds[i][2];
+    ellipse(cx, cy, 80 * s, 45 * s);
+    ellipse(cx + 30, cy - 10, 70 * s, 50 * s);
+    ellipse(cx + 60, cy, 80 * s, 40 * s);
+    ellipse(cx + 90, cy + 5, 60 * s, 35 * s);
   }
 }
 
@@ -506,12 +539,12 @@ function drawClouds() {
 function drawNNOverlay(nn) {
   if (!nn || !nn.lastHidden) return;
 
-  const PW  = 230;
-  const PH  = 185;
+  const PW = 230;
+  const PH = 185;
   const PAD = 12;
-  const px  = width  - PW - PAD;
-  const py  = height - PH - PAD;
-  const NR  = 8;
+  const px = width - PW - PAD;
+  const py = height - PH - PAD;
+  const NR = 8;
 
   // Panel background
   fill(15, 15, 15, 185);
@@ -568,7 +601,7 @@ function drawNNOverlay(nn) {
   noStroke();
 
   // Input nodes + labels
-  const inputLabels = ['Y', 'DIST', 'GAP', 'VEL'];
+  const inputLabels = ['Y', 'DIST', 'TOP', 'BOT', 'VEL'];
   for (let i = 0; i < iCount; i++) {
     const act = nn.lastInputs ? nn.lastInputs[i] : 0;
     fill(lerpColor(color(50, 50, 50), color(255, 220, 50), act));
@@ -599,9 +632,9 @@ function drawNNOverlay(nn) {
   fill(120);
   textSize(8);
   textAlign(CENTER, TOP);
-  text('IN',     colX[0], py + 18);
+  text('IN', colX[0], py + 18);
   text('HIDDEN', colX[1], py + 18);
-  text('OUT',    colX[2], py + 18);
+  text('OUT', colX[2], py + 18);
 }
 
 // ============================================================
@@ -617,9 +650,9 @@ function drawHUD(alive, score) {
   textSize(14);
   textAlign(LEFT, TOP);
 
-  text('GEN   ' + gen,                    24, 24);
-  text('ALIVE ' + alive + '/' + popSize,  24, 44);
-  text('SCORE ' + score,                  24, 64);
-  text('BEST  ' + bestScore,              24, 84);
-  text('PIPES ' + pipesPassed,            24, 104);
+  text('GEN   ' + gen, 24, 24);
+  text('ALIVE ' + alive + '/' + popSize, 24, 44);
+  text('SCORE ' + score, 24, 64);
+  text('BEST  ' + bestScore, 24, 84);
+  text('PIPES ' + pipesPassed, 24, 104);
 }
